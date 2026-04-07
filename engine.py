@@ -1,56 +1,50 @@
-from typing import Iterable, Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from tcod.context import Context
 from tcod.console import Console
 from tcod.map import compute_fov
 
-from entity import Entity
-from game_map import GameMap
-from input_handlers import EventHandler
+from input_handlers import MainGameEventHandler
 
-#the responsibilities of drawing the map and entities, 
-#as well as handling the player’s input.
+if TYPE_CHECKING:
+    from entity import Actor
+    from game_map import GameMap
+    from input_handlers import EventHandler
+
 
 class Engine:
-    def __init__(self, event_handler: EventHandler, game_map: GameMap, player: Entity):
-        self.event_handler = event_handler
-        self.game_map = game_map
-        self.player = player
-        self.update_fov()
+    game_map: GameMap
 
+    def __init__(self, player: Actor):
+        self.event_handler: EventHandler = MainGameEventHandler(self)
+        self.player = player
 
     def handle_enemy_turns(self) -> None:
-        for entity in self.game_map.entities - {self.player}:
-            print(f"The {entity.name} handles it's turn")
+        for entity in set(self.game_map.actors) - {self.player}:
+            if entity.ai:
+                entity.ai.perform()
 
-
-    def handle_events(self, events: Iterable[Any]) -> None:
-        for event in events:
-            action = self.event_handler.dispatch(event)
-
-            if action is None:
-                continue
-
-            action.perform(self, self.player)
-            self.handle_enemy_turns()
-            self.update_fov() #updates fov before the players next action
-
-
-    def update_fov(self) -> None: #change surrounding tiles to visible based on players pov
+    def update_fov(self) -> None:
+        """Recompute the visible area based on the players point of view."""
         self.game_map.visible[:] = compute_fov(
-                self.game_map.tiles["transparent"],
-                (self.player.x, self.player.y),
-                radius=8,
+            self.game_map.tiles["transparent"],
+            (self.player.x, self.player.y),
+            radius=8,
         )
-        #if tiile is visible it should be changed to explored
-        self.game_map.explored |= self.game_map.visible #|= sets explored array to include everything in visible array
-
+        # If a tile is "visible" it should be added to "explored".
+        self.game_map.explored |= self.game_map.visible
 
     def render(self, console: Console, context: Context) -> None:
         self.game_map.render(console)
 
+        console.print(
+            x=1,
+            y=47,
+            string=f"HP: {self.player.fighter.hp}/{self.player.fighter.max_hp}",
+        )
+
         context.present(console)
 
         console.clear()
-
-
