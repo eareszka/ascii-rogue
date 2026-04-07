@@ -13,20 +13,21 @@ if &shortmess =~ 'A'
 else
   set shortmess=aoO
 endif
-badd +14 main.py
+badd +33 main.py
 badd +0 !terminal
 badd +12 term://E:/roguelike//51700:C:/Windows/system32/cmd.exe
 badd +31 term://E:/roguelike//72656:C:/Windows/system32/cmd.exe
 badd +1 input_handlers.py
 badd +24 actions.py
 badd +16 entity.py
-badd +26 engine.py
+badd +38 engine.py
 badd +7 tile_types.py
-badd +17 game_map.py
+badd +12 game_map.py
+badd +93 procgen.py
 argglobal
 %argdel
 $argadd main.py
-edit engine.py
+edit game_map.py
 let s:save_splitbelow = &splitbelow
 let s:save_splitright = &splitright
 set splitbelow splitright
@@ -47,8 +48,8 @@ set winheight=1
 set winminwidth=0
 set winwidth=1
 exe 'vert 1resize ' . ((&columns * 30 + 104) / 209)
-exe 'vert 2resize ' . ((&columns * 88 + 104) / 209)
-exe 'vert 3resize ' . ((&columns * 89 + 104) / 209)
+exe 'vert 2resize ' . ((&columns * 89 + 104) / 209)
+exe 'vert 3resize ' . ((&columns * 88 + 104) / 209)
 argglobal
 enew
 file NvimTree_1
@@ -63,7 +64,7 @@ setlocal foldnestmax=20
 setlocal nofoldenable
 wincmd w
 argglobal
-balt actions.py
+balt procgen.py
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -74,19 +75,19 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 39 - ((38 * winheight(0) + 24) / 49)
+let s:l = 19 - ((18 * winheight(0) + 27) / 54)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 39
-normal! 0
+keepjumps 19
+normal! 068|
 wincmd w
 argglobal
 if bufexists(fnamemodify("main.py", ":p")) | buffer main.py | else | edit main.py | endif
 if &buftype ==# 'terminal'
   silent file main.py
 endif
-balt tile_types.py
+balt procgen.py
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -97,17 +98,17 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 44 - ((43 * winheight(0) + 24) / 49)
+let s:l = 36 - ((35 * winheight(0) + 27) / 54)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 44
-normal! 010|
+keepjumps 36
+normal! 05|
 wincmd w
 2wincmd w
 exe 'vert 1resize ' . ((&columns * 30 + 104) / 209)
-exe 'vert 2resize ' . ((&columns * 88 + 104) / 209)
-exe 'vert 3resize ' . ((&columns * 89 + 104) / 209)
+exe 'vert 2resize ' . ((&columns * 89 + 104) / 209)
+exe 'vert 3resize ' . ((&columns * 88 + 104) / 209)
 tabnext 1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
   silent exe 'bwipe ' . s:wipebuf
