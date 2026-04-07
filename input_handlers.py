@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, Set, TYPE_CHECKING
 
 import tcod.event
 
@@ -16,10 +16,6 @@ MOVE_KEYS = {
     tcod.event.K_DOWN: (0, 1),
     tcod.event.K_LEFT: (-1, 0),
     tcod.event.K_RIGHT: (1, 0),
-    tcod.event.K_HOME: (-1, -1),
-    tcod.event.K_END: (-1, 1),
-    tcod.event.K_PAGEUP: (1, -1),
-    tcod.event.K_PAGEDOWN: (1, 1),
     # Numpad keys.
     tcod.event.K_KP_1: (-1, 1),
     tcod.event.K_KP_2: (0, 1),
@@ -29,15 +25,11 @@ MOVE_KEYS = {
     tcod.event.K_KP_7: (-1, -1),
     tcod.event.K_KP_8: (0, -1),
     tcod.event.K_KP_9: (1, -1),
-    # Vi keys.
-    tcod.event.K_h: (-1, 0),
-    tcod.event.K_j: (0, 1),
-    tcod.event.K_k: (0, -1),
-    tcod.event.K_l: (1, 0),
-    tcod.event.K_y: (-1, -1),
-    tcod.event.K_u: (1, -1),
-    tcod.event.K_b: (-1, 1),
-    tcod.event.K_n: (1, 1),
+    # WASD keys.
+    tcod.event.K_w: (0, -1),
+    tcod.event.K_s: (0, 1),
+    tcod.event.K_a: (-1, 0),
+    tcod.event.K_d: (1, 0),
 }
 
 WAIT_KEYS = {
@@ -51,7 +43,7 @@ class EventHandler(tcod.event.EventDispatch[Action]):
     def __init__(self, engine: Engine):
         self.engine = engine
 
-    def handle_events(self) -> None:
+    def handle_events(self, dt: float) -> None:
         raise NotImplementedError()
 
     def ev_quit(self, event: tcod.event.Quit) -> Optional[Action]:
@@ -59,55 +51,45 @@ class EventHandler(tcod.event.EventDispatch[Action]):
 
 
 class MainGameEventHandler(EventHandler):
-    def handle_events(self) -> None:
-        for event in tcod.event.wait():
-            action = self.dispatch(event)
+    def __init__(self, engine: Engine):
+        super().__init__(engine)
+        self.held_keys: Set[int] = set()
+        self.player_move_timer: float = 0.0
 
-            if action is None:
-                continue
-
-            action.perform()
-
-            self.engine.handle_enemy_turns()
-            self.engine.update_fov()  # Update the FOV before the players next action.
-
-    def ev_keydown(self, event: tcod.event.KeyDown) -> Optional[Action]:
-        action: Optional[Action] = None
-
-        key = event.sym
+    def handle_events(self, dt: float) -> None:
+        for event in tcod.event.get():
+            self.dispatch(event)
 
         player = self.engine.player
 
-        if key in MOVE_KEYS:
-            dx, dy = MOVE_KEYS[key]
-            action = BumpAction(player, dx, dy)
-        elif key in WAIT_KEYS:
-            action = WaitAction(player)
+        self.player_move_timer -= dt
+        if self.player_move_timer <= 0:
+            for key, (dx, dy) in MOVE_KEYS.items():
+                if key in self.held_keys:
+                    BumpAction(player, dx, dy).perform()
+                    self.engine.update_fov()
+                    self.player_move_timer = 1.0 / player.movement_speed
+                    break
 
-        elif key == tcod.event.K_ESCAPE:
-            action = EscapeAction(player)
+    def ev_keydown(self, event: tcod.event.KeyDown) -> Optional[Action]:
+        self.held_keys.add(event.sym)
 
-        # No valid key was pressed
-        return action
+        if event.sym == tcod.event.K_ESCAPE:
+            EscapeAction(self.engine.player).perform()
+
+        return None
+
+    def ev_keyup(self, event: tcod.event.KeyUp) -> Optional[Action]:
+        self.held_keys.discard(event.sym)
+        return None
 
 
 class GameOverEventHandler(EventHandler):
-    def handle_events(self) -> None:
-        for event in tcod.event.wait():
-            action = self.dispatch(event)
-
-            if action is None:
-                continue
-
-            action.perform()
+    def handle_events(self, dt: float) -> None:
+        for event in tcod.event.get():
+            self.dispatch(event)
 
     def ev_keydown(self, event: tcod.event.KeyDown) -> Optional[Action]:
-        action: Optional[Action] = None
-
-        key = event.sym
-
-        if key == tcod.event.K_ESCAPE:
-            action = EscapeAction(self.engine.player)
-
-        # No valid key was pressed
-        return action
+        if event.sym == tcod.event.K_ESCAPE:
+            EscapeAction(self.engine.player).perform()
+        return None

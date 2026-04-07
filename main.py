@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import copy
+import time
 
 import tcod
 
@@ -12,14 +13,14 @@ def main() -> None:
     screen_width = 80
     screen_height = 50
 
-    map_width = 80
-    map_height = 45
+    map_width = 200
+    map_height = 150
 
-    room_max_size = 10
+    room_max_size = 14
     room_min_size = 6
-    max_rooms = 30
+    max_rooms = 80
 
-    max_monsters_per_room = 2
+    max_monsters_per_room = 3
 
     tileset = tcod.tileset.load_tilesheet(
         "dejavu10x10_gs_tc.png", 32, 8, tcod.tileset.CHARMAP_TCOD
@@ -48,10 +49,15 @@ def main() -> None:
         vsync=True,
     ) as context:
         root_console = tcod.Console(screen_width, screen_height, order="F")
+        last_time = time.perf_counter()
         while True:
-            engine.render(console=root_console, context=context)
+            now = time.perf_counter()
+            dt = now - last_time
+            last_time = now
 
-            engine.event_handler.handle_events()
+            engine.render(console=root_console, context=context)
+            engine.update(dt)
+            engine.event_handler.handle_events(dt)
 
 
 if __name__ == "__main__":

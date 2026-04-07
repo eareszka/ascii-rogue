@@ -78,7 +78,8 @@ class Actor(Entity):
         color: Tuple[int, int, int] = (255, 255, 255),
         name: str = "<Unnamed>",
         ai_cls: Type[BaseAI],
-        fighter: Fighter
+        fighter: Fighter,
+        movement_speed: float = 8.0,
     ):
         super().__init__(
             x=x,
@@ -94,6 +95,8 @@ class Actor(Entity):
 
         self.fighter = fighter
         self.fighter.entity = self
+
+        self.movement_speed = movement_speed  # tiles per second
 
     @property
     def is_alive(self) -> bool:
