@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import Iterable, Iterator, Optional, TYPE_CHECKING
 
-import numpy as np  # type: ignore
-from tcod.console import Console
+import numpy as np
+import pygame
 
 from entity import Actor
+from settings import TILE_SIZE
 import tile_types
 
 if TYPE_CHECKING:
@@ -22,16 +23,11 @@ class GameMap:
         self.entities = set(entities)
         self.tiles = np.full((width, height), fill_value=tile_types.wall, order="F")
 
-        self.visible = np.full(
-            (width, height), fill_value=False, order="F"
-        )  # Tiles the player can currently see
-        self.explored = np.full(
-            (width, height), fill_value=False, order="F"
-        )  # Tiles the player has seen before
+        self.visible = np.full((width, height), fill_value=False, order="F")
+        self.explored = np.full((width, height), fill_value=False, order="F")
 
     @property
     def actors(self) -> Iterator[Actor]:
-        """Iterate over this maps living actors."""
         yield from (
             entity
             for entity in self.entities
@@ -48,52 +44,60 @@ class GameMap:
                 and entity.y == location_y
             ):
                 return entity
-
         return None
 
     def get_actor_at_location(self, x: int, y: int) -> Optional[Actor]:
         for actor in self.actors:
             if actor.x == x and actor.y == y:
                 return actor
-
         return None
 
     def in_bounds(self, x: int, y: int) -> bool:
-        """Return True if x and y are inside of the bounds of this map."""
         return 0 <= x < self.width and 0 <= y < self.height
 
-    def render(self, console: Console, cam_x: int, cam_y: int) -> None:
+    def render(self, surface: pygame.Surface, font: pygame.font.Font, cam_x: float, cam_y: float) -> None:
         """
-        Renders the portion of the map visible through the camera viewport.
-
-        cam_x, cam_y is the top-left map tile that maps to console (0, 0).
+        Render the map and entities. cam_x/cam_y are the top-left tile
+        position of the viewport as floats for sub-tile smooth scrolling.
         """
-        view_width = console.width
-        view_height = console.height
+        ts = TILE_SIZE
+        sw = surface.get_width()
+        sh = surface.get_height()
 
-        # Clamp camera so it never goes out of map bounds.
-        cam_x = max(0, min(cam_x, self.width - view_width))
-        cam_y = max(0, min(cam_y, self.height - view_height))
+        # Convert float camera to integer pixel offset for 1-pixel-precise scrolling.
+        cam_px = int(cam_x * ts)
+        cam_py = int(cam_y * ts)
 
-        # Slice the map arrays to the viewport region.
-        map_slice = np.s_[cam_x : cam_x + view_width, cam_y : cam_y + view_height]
+        # Tile range that could be on screen.
+        tx_start = max(0, cam_px // ts)
+        ty_start = max(0, cam_py // ts)
+        tx_end = min(self.width,  (cam_px + sw) // ts + 2)
+        ty_end = min(self.height, (cam_py + sh) // ts + 2)
 
-        console.tiles_rgb[0:view_width, 0:view_height] = np.select(
-            condlist=[self.visible[map_slice], self.explored[map_slice]],
-            choicelist=[self.tiles["light"][map_slice], self.tiles["dark"][map_slice]],
-            default=tile_types.SHROUD,
-        )
+        surface.fill((0, 0, 0))
 
-        entities_sorted_for_rendering = sorted(
-            self.entities, key=lambda x: x.render_order.value
-        )
+        # Draw tile backgrounds.
+        for ty in range(ty_start, ty_end):
+            for tx in range(tx_start, tx_end):
+                px = tx * ts - cam_px
+                py = ty * ts - cam_py
 
-        for entity in entities_sorted_for_rendering:
-            screen_x = entity.x - cam_x
-            screen_y = entity.y - cam_y
-            if (
-                0 <= screen_x < view_width
-                and 0 <= screen_y < view_height
-                and self.visible[entity.x, entity.y]
-            ):
-                console.print(x=screen_x, y=screen_y, string=entity.char, fg=entity.color)
+                if self.visible[tx, ty]:
+                    color = tuple(int(c) for c in self.tiles["light"]["bg"][tx, ty])
+                elif self.explored[tx, ty]:
+                    color = tuple(int(c) for c in self.tiles["dark"]["bg"][tx, ty])
+                else:
+                    continue  # black (already filled)
+
+                pygame.draw.rect(surface, color, (px, py, ts, ts))
+
+        # Draw entities on top.
+        for entity in sorted(self.entities, key=lambda e: e.render_order.value):
+            if not self.in_bounds(entity.x, entity.y):
+                continue
+            if not self.visible[entity.x, entity.y]:
+                continue
+            px = int(entity.visual_x * ts) - cam_px + 4
+            py = int(entity.visual_y * ts) - cam_py - 4
+            char_surf = font.render(entity.char, True, entity.color)
+            surface.blit(char_surf, (px, py))

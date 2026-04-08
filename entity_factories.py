@@ -8,7 +8,7 @@ player = Actor(
     name="Player",
     ai_cls=HostileEnemy,
     fighter=Fighter(hp=30, defense=2, power=5),
-    movement_speed=8.0,  # tiles per second
+    movement_speed=5.0,  # tiles per second
 )
 
 orc = Actor(
